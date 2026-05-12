@@ -1,7 +1,7 @@
 <script lang="ts">
   import { askAI } from '$lib/services/aiService';
   import { tick } from 'svelte';
-  import { stopPropagation } from 'svelte/legacy';
+  import { describeImageAI } from '$lib/services/imageService';
 
   let { open = $bindable(false) }: { open: boolean } = $props();
   let userInput = $state('');
@@ -28,6 +28,21 @@
     chatContainer?.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
   }
 
+  async function scanFloorPlan() {
+    loading = true;
+    messages = [...messages, { role: 'user', text: 'Scanning your uploaded floor plan...' }];
+
+    await tick();
+    chatContainer?.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
+
+    const answer = await describeImageAI();
+    messages = [...messages, { role: 'ai', text: answer }];
+    loading = false;
+
+    await tick();
+    chatContainer?.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
+}
+
   function onKeydown(e: KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -41,11 +56,16 @@
   
   <!-- Header -->
   <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+
     <div class="flex items-center gap-2">
+
       <img src="/ai-logo.png" alt="AI" width="20" height="20" />
       <span class="font-semibold text-sm text-gray-800 dark:text-gray-100">AI Assistent</span>
+      <button onclick={scanFloorPlan} disabled={loading} class="px-2 py-1 text-xs bg-slate-600 text-white rounded hover:bg-slate-500 disabled:opacity-50"> Scan Floorplan </button>
+
     </div>
     <button onclick={() => open = false} class="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+
   </div>
 
   <!-- Messages -->
