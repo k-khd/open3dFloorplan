@@ -121,7 +121,9 @@ export function buildRoomCopy(
     const currentWallById = new Map(workingWalls.map(w => [w.id, w] as const));
     
     // Find all rooms that belong to the same series (e.g. "Room 1", "Room 1 Copy 1", "Room 1 Copy 2")
-    const seriesRooms = workingRooms.filter(r => normalizeBaseName(r.name) === normalizeBaseName(baseRoomName));
+    const seriesRooms = workingRooms.filter(r =>
+      Array.isArray(r.walls) && normalizeBaseName(r.name) === normalizeBaseName(baseRoomName)
+    );
     const seriesWallIds = new Set<string>();
 
     // Collect all wall IDs from the series to find the rightmost x position
