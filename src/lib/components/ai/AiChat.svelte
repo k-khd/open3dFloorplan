@@ -1,7 +1,7 @@
 <script lang="ts">
   import { askAI } from '$lib/services/aiService';
   import { tick } from 'svelte';
-  import { describeImageAI } from '$lib/services/imageService';
+  import { scanAndBuildFloorplan } from '$lib/services/imageService';
 
   let { open = $bindable(false) }: { open: boolean } = $props();
   let userInput = $state('');
@@ -35,8 +35,8 @@
     await tick();
     chatContainer?.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
 
-    const answer = await describeImageAI();
-    messages = [...messages, { role: 'ai', text: answer }];
+    const result = await scanAndBuildFloorplan();
+    messages = [...messages, { role: 'ai', text: result.message }];
     loading = false;
 
     await tick();
@@ -71,7 +71,9 @@
   <!-- Messages -->
   <div class="flex-1 overflow-y-auto p-4 space-y-3" bind:this={chatContainer}>
     {#if messages.length === 0}
-      <p class="text-sm text-gray-400 text-center mt-8">Stel een vraag over je plattegrond</p>
+      <p class="text-sm text-gray-400 text-center mt-8">Test verschillende opdrachten met behulp van AI:</p>
+      <p class="text-sm text-gray-400 text-center mt-8">Plak een 2D plattegrond en genereer de tekening met "Scan Floorplan"</p>
+      <p class="text-sm text-gray-400 text-center mt-8">Simpele taken zoals kamergeneratie en objecten zoals deuren plaatsen</p>
     {/if}
     {#each messages as msg}
       <div class="flex {msg.role === 'user' ? 'justify-end' : 'justify-start'}">
