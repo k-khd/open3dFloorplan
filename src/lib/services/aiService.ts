@@ -3,14 +3,17 @@ import { currentProject, loadProject } from '$lib/stores/project';
 import { executeActionPlan } from '$lib/services/roomCopyService';
 
 export async function askAI(userMessage: string) {
+  // get current project and active floor details  
   const project = get(currentProject);
   if (!project) return 'No project loaded.';
 
   const floor = project.floors.find(f => f.id === project.activeFloorId);
   if (!floor) return 'No active floor loaded.';
 
+  // make a list of only the room names
   const roomSummary = floor.rooms.map(r => r.name);
 
+  // specific prompt for AI. Prompt contains all avaivable rooms, available furniture id's and strict instructions for the JSON format
   const prompt = `
   Je bent de AI-engine voor een floorplanner app. 1 meter = 100 units.
   
@@ -51,6 +54,7 @@ export async function askAI(userMessage: string) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "qwen2.5-coder:7b",
+        // AI will only return valid JSON
         format: "json",
         num_predict: 2048,
         messages: [{ role: "user", content: prompt }],
@@ -58,18 +62,24 @@ export async function askAI(userMessage: string) {
       })
     });
 
+    // AI reponse converted to JSON
     const data = await response.json();
+
     let rawContent = data.message.content.trim();
     let actionPlan: any[] = [];
-
+    
     try {
+      // Attempt to parse the AI response text into JavaScript object
       const parsed = JSON.parse(rawContent);
+       // Option 1: AI returned a JSON array directly, use it
       if (Array.isArray(parsed)) {
         actionPlan = parsed;
       } else if (parsed && typeof parsed === 'object') {
         if ('actions' in parsed && Array.isArray(parsed.actions)) {
+          // Option 2: AI returned an object with an "actions" array, unwrap it
           actionPlan = parsed.actions;
         } else {
+          // Option 3: AI returned a single action object, that will be wrapped in an array
           actionPlan = [parsed];
         }
       }
@@ -80,15 +90,19 @@ export async function askAI(userMessage: string) {
 
     console.log("DEBUG: AI Genest Actieplan:", actionPlan);
 
+    // Create a copy of the project to apply changes
     const updatedProject = { ...project };
+
+    // send the plan roomCopyService 
     const success = executeActionPlan(updatedProject, actionPlan);
-    
     if (success) {
+      // if it worked, load the updated project so the editor shows the changes
       loadProject(updatedProject);
       return `Instructies succesvol uitgevoerd!`;
     } else {
       return "Actie geannuleerd: kon de doelkamer niet vinden op het canvas.";
     }
+
   } catch (error) {
     console.error("Fetch error:", error);
     return "Fout bij verbinden met Ollama.";
