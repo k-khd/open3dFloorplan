@@ -200,7 +200,7 @@ export function executeAction(floor: any, toolCall: any): string {
         id: generateId(),
         catalogId: args.catalogId,
         position: { x: pos.x, y: pos.y },
-        rotation: 0,
+        rotation: args.position === "links" ? 270 : args.position === "rechts" ? 90 : args.position === "onder" ? 180 : 0,
         scale: { x: 1, y: 1, z: 1 }
       });
       return `${args.catalogId} geplaatst in ${args.room}.`;
