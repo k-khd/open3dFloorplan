@@ -72,8 +72,10 @@
   <div class="flex-1 overflow-y-auto p-4 space-y-3" bind:this={chatContainer}>
     {#if messages.length === 0}
       <p class="text-sm text-gray-400 text-center mt-8">Test verschillende opdrachten met behulp van AI:</p>
-      <p class="text-sm text-gray-400 text-center mt-8">Plak een 2D plattegrond en genereer de tekening met "Scan Floorplan"</p>
-      <p class="text-sm text-gray-400 text-center mt-8">Simpele taken zoals kamergeneratie en objecten zoals deuren plaatsen</p>
+      <p class="text-sm text-gray-400 text-center mt-8">Genereer simpele kamers en label ze met een specifieke ID</p>
+      <p class="text-sm text-gray-400 text-center mt-8">Meubels, deuren, ramen en trappen plaatsen binnen specifieke kamers is mogelijk (vermeld ID)</p>
+      <p class="text-sm text-gray-400 text-center mt-8">Probeer zo specifiek mogelijk te zijn!</p>
+
     {/if}
     {#each messages as msg}
       <div class="flex {msg.role === 'user' ? 'justify-end' : 'justify-start'}">
