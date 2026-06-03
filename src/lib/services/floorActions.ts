@@ -104,6 +104,13 @@ export function executeAction(floor: any, toolCall: any): string {
       // used to calculate how far each copy needs to shift
       const minX = Math.min(...sourceWalls.map((w: any) => Math.min(w.start.x, w.end.x)));
 
+      // snapshot original items before the loop so we don't copy copies
+      const sourceWallIds = sourceRoom.walls;
+      const originalDoors = [...floor.doors];
+      const originalWindows = [...floor.windows];
+      const originalFurniture = [...floor.furniture];
+      const sourceBounds = getRoomBounds(sourceWalls);
+
       for (let i = 0; i < (args.copies || 1); i++) {
         let startX = getRightmostX(floor);
         startX += 200;
@@ -126,6 +133,42 @@ export function executeAction(floor: any, toolCall: any): string {
           floorTexture: sourceRoom.floorTexture,
           area: sourceRoom.area
         });
+
+        // copy doors that belong to this room's walls
+        for (const door of originalDoors) {
+          if (sourceWallIds.includes(door.wallId)) {
+            const oldWallIndex = sourceWallIds.indexOf(door.wallId);
+            floor.doors.push({
+              ...door,
+              id: generateId(),
+              wallId: newWalls[oldWallIndex].id
+            });
+          }
+        }
+
+        // copy windows that belong to this room's walls
+        for (const window of originalWindows) {
+          if (sourceWallIds.includes(window.wallId)) {
+            const oldWallIndex = sourceWallIds.indexOf(window.wallId);
+            floor.windows.push({
+              ...window,
+              id: generateId(),
+              wallId: newWalls[oldWallIndex].id
+            });
+          }
+        }
+
+        // copy furniture inside this room
+        for (const item of originalFurniture) {
+          if (item.position.x >= sourceBounds.minX && item.position.x <= sourceBounds.maxX &&
+              item.position.y >= sourceBounds.minY && item.position.y <= sourceBounds.maxY) {
+            floor.furniture.push({
+              ...item,
+              id: generateId(),
+              position: { x: item.position.x + offsetX, y: item.position.y }
+            });
+          }
+        }
       }
       return `${args.room} ${args.copies}x gekopieerd.`;
     }
