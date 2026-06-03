@@ -109,6 +109,7 @@ export function executeAction(floor: any, toolCall: any): string {
       const originalDoors = [...floor.doors];
       const originalWindows = [...floor.windows];
       const originalFurniture = [...floor.furniture];
+      const originalStairs = [...floor.stairs];
       const sourceBounds = getRoomBounds(sourceWalls);
 
       for (let i = 0; i < (args.copies || 1); i++) {
@@ -133,7 +134,7 @@ export function executeAction(floor: any, toolCall: any): string {
           floorTexture: sourceRoom.floorTexture,
           area: sourceRoom.area
         });
-
+        
         // copy doors that belong to this room's walls
         for (const door of originalDoors) {
           if (sourceWallIds.includes(door.wallId)) {
@@ -169,6 +170,19 @@ export function executeAction(floor: any, toolCall: any): string {
             });
           }
         }
+
+         // copy stairs that belong to this room
+        for (const stair of originalStairs) {
+          if (stair.position.x >= sourceBounds.minX && stair.position.x <= sourceBounds.maxX &&
+              stair.position.y >= sourceBounds.minY && stair.position.y <= sourceBounds.maxY) {
+            floor.stairs.push({
+              ...stair,
+              id: generateId(),
+              position: { x: stair.position.x + offsetX, y: stair.position.y }
+            });
+          }
+        }
+
       }
       return `${args.room} ${args.copies}x gekopieerd.`;
     }
