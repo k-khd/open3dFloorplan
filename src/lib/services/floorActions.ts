@@ -1,3 +1,7 @@
+import { detectRooms } from '$lib/utils/roomDetection';
+import { detectedRoomsStore } from '$lib/stores/project';
+
+
 const generateId = () => Math.random().toString(36).substring(2, 10);
 
 // finds which wall matches a direction (boven/onder/links/rechts) within a room
@@ -47,6 +51,19 @@ function getRightmostX(floor: any): number {
     startX = Math.max(startX, wall.start.x, wall.end.x);
   }
   return startX;
+}
+
+// refreshes room labels on the canvas after any floor change
+// needed because the canvas caches detected rooms and won't re-read names otherwise
+export function refreshRoomLabels(floor: any): void {
+  const freshRooms = detectRooms(floor.walls);
+  freshRooms.forEach((detected: any) => {
+    const match = floor.rooms.find((r: any) =>
+      JSON.stringify([...r.walls].sort()) === JSON.stringify([...detected.walls].sort())
+    );
+    if (match) detected.name = match.name;
+  });
+  detectedRoomsStore.set(freshRooms);
 }
 
 // executes one tool call from the AI on the floor data

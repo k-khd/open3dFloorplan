@@ -1,7 +1,7 @@
 import { get } from 'svelte/store';
 import { currentProject, loadProject } from '$lib/stores/project';
 import { tools } from './aiTools';
-import { executeAction } from './floorActions';
+import { executeAction, refreshRoomLabels } from './floorActions';
 
 export async function askAI(userMessage: string) {
   const project = get(currentProject);
@@ -37,6 +37,7 @@ export async function askAI(userMessage: string) {
       }
 
       loadProject(updatedProject);
+      refreshRoomLabels(activeFloor);
       return result.trim();
     }
 
