@@ -2,6 +2,7 @@
 // the AI reads these descriptions to decide which function to use
 export const tools = [
   {
+    // create_room for creating a new room from scratch, the AI needs to provide a name and dimensions for the room
     type: "function",
     function: {
       name: "create_room",
@@ -18,6 +19,7 @@ export const tools = [
     }
   },
   {
+    // copy_room for copying an existing room a number of times, the AI needs to provide the name of the room to copy and how many copies to make
     type: "function",
     function: {
       name: "copy_room",
@@ -33,6 +35,8 @@ export const tools = [
     }
   },
   {
+    // add_furniture for placing furniture in a room, the AI needs to provide the catalogId of the furniture (which type of furniture),
+    // the name of the room to place it in and the position within the room
     type: "function",
     function: {
       name: "add_furniture",
@@ -49,6 +53,7 @@ export const tools = [
     }
   },
   {
+    // add_door for placing a door on a wall, the AI needs to provide the name of the room, which wall to place it on and the type of door
     type: "function",
     function: {
       name: "add_door",
@@ -65,6 +70,7 @@ export const tools = [
     }
   },
   {
+    // add_window for placing a window on a wall, the AI needs to provide the name of the room, which wall to place it on and the type of window
     type: "function",
     function: {
       name: "add_window",
@@ -81,6 +87,7 @@ export const tools = [
     }
   },
   {
+    // add_stairs for placing a staircase in a room, the AI needs to provide the name of the room, the type of stairs and the position within the room
     type: "function",
     function: {
       name: "add_stairs",
@@ -97,6 +104,7 @@ export const tools = [
     }
   },
   {
+    // label_room for changing the name of a room, the AI needs to provide the current name and the new name
     type: "function",
     function: {
       name: "label_room",
