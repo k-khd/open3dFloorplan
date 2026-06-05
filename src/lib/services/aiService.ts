@@ -10,13 +10,20 @@ export async function askAI(userMessage: string) {
   const floor = project.floors.find(f => f.id === project.activeFloorId);
   if (!floor) return 'No active floor loaded.';
 
+  const roomName = floor.rooms.map((r: any) => r.name).join(", ");
+
   try {
     const response = await fetch("http://localhost:11434/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "granite4.1:3b", 
-        messages: [{ role: "user", content: userMessage }],
+        messages: [
+          { role: "system", content: `Je bent een behulpzame assistent voor het ontwerpen van plattegronden. Je helpt alleen gebruikers in het Nederlands met het aanmaken van kamers, plaatsen van meubels, deuren, ramen en trappen. Als je geen actie hoeft uit te voeren, praat je gewoon vriendelijk terug. 
+            Houd je antwoorden kort en bondig, maximaal 2-3 zinnen. Geen opsommingen of lijstjes tenzij de gebruiker erom vraagt.
+            De beschikbare kamers op de huidige plattegrond zijn: ${roomName}.`},
+          { role: "user", content: userMessage }
+        ],
         tools: tools,
         stream: false,
       })
