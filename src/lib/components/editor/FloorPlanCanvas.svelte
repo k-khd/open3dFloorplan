@@ -822,8 +822,13 @@
     const hash = JSON.stringify(currentFloor.walls.map(w => [w.start, w.end]));
     if (hash === lastWallHash) return;
     lastWallHash = hash;
+
+    // Detect rooms based on current walls
     const newRooms = detectRooms(currentFloor.walls);
+
+    // JSON storage
     const savedRooms = currentFloor.rooms || [];
+
     for (const nr of newRooms) {
       const nrWalls = new Set(nr.walls);
       const existing = detectedRooms.find(old => {
@@ -846,7 +851,9 @@
         }
       }
     }
+    // Draw on canvas
     detectedRooms = newRooms;
+    // UI store
     detectedRoomsStore.set(newRooms);
   }
 

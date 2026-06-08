@@ -1,5 +1,6 @@
 import { writable, derived, get } from 'svelte/store';
 import type { Project, Floor, Wall, Door, Window as Win, FurnitureItem, Point, Stair, Column, BackgroundImage, GuideLine, ElementGroup } from '$lib/models/types';
+import { syncFloorRooms } from '$lib/utils/roomDetection';
 
 
 function uid(): string {
@@ -40,6 +41,9 @@ export const selectedElementId = writable<string | null>(null);
 /** Multi-select: set of element IDs currently selected (used alongside selectedElementId for marquee/shift-click) */
 export const selectedElementIds = writable<Set<string>>(new Set());
 export const viewMode = writable<'2d' | '3d'>('2d');
+
+/** Detected rooms (synced from canvas room detection) */
+export const detectedRoomsStore = writable<import('$lib/models/types').Room[]>([]);
 
 // Undo / Redo
 interface UndoEntry {
@@ -155,6 +159,12 @@ function mutate(fn: (floor: Floor) => void, description?: string) {
   const floor = p.floors.find((f) => f.id === p.activeFloorId);
   if (!floor) return;
   fn(floor);
+
+  // update existing rooms list based on walls
+  floor.rooms = syncFloorRooms(floor);
+  // sync detected rooms store for UI
+  detectedRoomsStore.set(floor.rooms);
+
   p.updatedAt = new Date();
   currentProject.set({ ...p });
 }
@@ -528,8 +538,6 @@ export function importFloorIntoCurrentProject(floor: import('$lib/models/types')
 }
 
 export const selectedRoomId = writable<string | null>(null);
-/** Detected rooms (synced from canvas room detection) */
-export const detectedRoomsStore = writable<import('$lib/models/types').Room[]>([]);
 /** catalogId currently being placed (null = not placing) */
 export const placingFurnitureId = writable<string | null>(null);
 /** Rotation angle for furniture being placed */

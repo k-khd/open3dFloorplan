@@ -1,4 +1,4 @@
-import type { Wall, Point, Room } from '$lib/models/types';
+import type { Wall, Point, Room, Floor } from '$lib/models/types';
 
 const EPSILON = 5; // snap distance for matching endpoints
 
@@ -235,6 +235,45 @@ function shoelace(pts: Point[]): number {
     sum += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
   }
   return sum / 2;
+}
+
+
+/**
+ * Simple helper used to check if two rooms have the same walls. Used to sync detected rooms with existing rooms to preserve attributes
+ */
+function sameWalls(a: string[], b: string[]): boolean {
+  const setA = new Set(a);
+  const setB = new Set(b);
+  if (setA.size !== setB.size) return false;
+  for (const wallId of setA) {
+    if (!setB.has(wallId)) return false;
+  }
+  return true;
+}
+
+/**
+ * previous - old room data from JSON (floor.rooms)
+ * detected - new room data list from detectRooms() based on current walls
+ * detectRoom calculates new rooms, for each detected room: if same walls exist in previous, copy attributes
+ * return detected: rooms that are not detected anymore are lost, floor.rooms will be overwritten with the detected list
+ */
+
+export function syncFloorRooms(floor: Floor) {
+  const previous = floor.rooms || [];
+  const detected = detectRooms(floor.walls);
+
+  for (const r of detected) {
+    const existing = previous.find(pr => sameWalls(pr.walls, r.walls));
+    if (existing) {
+      r.id = existing.id;
+      r.name = existing.name;
+      r.floorTexture = existing.floorTexture;
+      if (existing.color !== undefined) r.color = existing.color;
+      if (existing.roomType !== undefined) r.roomType = existing.roomType;
+      if (existing.labelOffset !== undefined) r.labelOffset = existing.labelOffset;
+    }
+  }
+  return detected;
 }
 
 /**
