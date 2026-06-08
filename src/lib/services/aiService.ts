@@ -1,9 +1,9 @@
 import { get } from 'svelte/store';
-import { currentProject, loadProject, detectedRoomsStore } from '$lib/stores/project';
+import { currentProject, loadProject, detectedRoomsStore, snapshot } from '$lib/stores/project';
 import { tools } from './aiTools';
 import { executeAction } from './floorActions';
 import { syncFloorRooms } from '$lib/utils/roomDetection';
-
+ 
 export async function askAI(userMessage: string) {
   const project = get(currentProject);
   if (!project) return 'No project loaded.';
@@ -37,19 +37,22 @@ export async function askAI(userMessage: string) {
     if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
       const updatedProject = { ...project };
       const activeFloor = updatedProject.floors.find((f: any) => f.id === updatedProject.activeFloorId);
+      
+      snapshot(userMessage);
+
       if (!activeFloor) return 'No active floor.';
 
       let result = "";
       for (const toolCall of data.message.tool_calls) {
         result += executeAction(activeFloor, toolCall) + " ";
       }
-
-      loadProject(updatedProject);
+      
+      currentProject.set(updatedProject);
       // sync floor rooms based on walls after executing actions
       activeFloor.rooms = syncFloorRooms(activeFloor);
       // update detected rooms store for UI
       detectedRoomsStore.set(activeFloor.rooms);
-      
+
       return result.trim();
     }
 

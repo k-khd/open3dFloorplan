@@ -93,7 +93,7 @@ export function endUndoGroup(description?: string) {
   }
 }
 
-function snapshot(description?: string) {
+export function snapshot(description?: string) {
   // If inside an undo group, skip — the group handles the snapshot
   if (undoGroupDepth > 0) return;
   const p = get(currentProject);
