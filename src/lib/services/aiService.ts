@@ -1,7 +1,8 @@
 import { get } from 'svelte/store';
-import { currentProject, loadProject } from '$lib/stores/project';
+import { currentProject, loadProject, detectedRoomsStore } from '$lib/stores/project';
 import { tools } from './aiTools';
-import { executeAction, refreshRoomLabels } from './floorActions';
+import { executeAction } from './floorActions';
+import { syncFloorRooms } from '$lib/utils/roomDetection';
 
 export async function askAI(userMessage: string) {
   const project = get(currentProject);
@@ -44,7 +45,11 @@ export async function askAI(userMessage: string) {
       }
 
       loadProject(updatedProject);
-      refreshRoomLabels(activeFloor);
+      // sync floor rooms based on walls after executing actions
+      activeFloor.rooms = syncFloorRooms(activeFloor);
+      // update detected rooms store for UI
+      detectedRoomsStore.set(activeFloor.rooms);
+      
       return result.trim();
     }
 
