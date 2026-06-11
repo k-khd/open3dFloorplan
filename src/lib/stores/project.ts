@@ -464,6 +464,120 @@ export function updateRoom(id: string, updates: Partial<{ name: string; floorTex
   });
 }
 
+/** 
+ * Create a room as 4 walls placed to the right of existing geometry. Dimensions in cm.
+ *  Runs through mutate() so undo + room detection are handled automatically.
+*/
+export function createRoom(name: string, widthCm: number, heightCm: number): string {
+  const roomId = uid();
+  mutate((f) => {
+    let startX = 0;
+    for (const w of f.walls) startX = Math.max(startX, w.start.x, w.end.x);
+    if (f.walls.length > 0) startX += 200; // 2m gap from existing rooms
+
+    const mk = (start: Point, end: Point): Wall => ({ id: uid(), start, end, thickness: 15, height: 280, color: '#444444' });
+    const wN = mk({ x: startX, y: 0 }, { x: startX + widthCm, y: 0 });
+    const wE = mk({ x: startX + widthCm, y: 0 }, { x: startX + widthCm, y: heightCm });
+    const wS = mk({ x: startX + widthCm, y: heightCm }, { x: startX, y: heightCm });
+    const wW = mk({ x: startX, y: heightCm }, { x: startX, y: 0 });
+    f.walls.push(wN, wE, wS, wW);
+
+    // The room name is preserved by syncFloorRooms() (matches detected room by wall ids).
+    f.rooms.push({ id: roomId, name, walls: [wN.id, wE.id, wS.id, wW.id], floorTexture: 'hardwood', area: (widthCm / 100) * (heightCm / 100) });
+  }, `Created room ${name}`);
+  return roomId;
+}
+
+/** 
+ * Resize a room by scaling its walls toward the top-left bound. Dimensions in cm.
+ *  Shared walls with neighbouring rooms will move along — acceptable for an MVP. 
+*/
+export function resizeRoom(roomId: string, newWidthCm?: number, newHeightCm?: number): void {
+  mutate((f) => {
+    const room = f.rooms.find((r) => r.id === roomId);
+    if (!room) return;
+    const ws = f.walls.filter((w) => room.walls.includes(w.id));
+    if (ws.length === 0) return;
+
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const w of ws) {
+      minX = Math.min(minX, w.start.x, w.end.x);
+      maxX = Math.max(maxX, w.start.x, w.end.x);
+      minY = Math.min(minY, w.start.y, w.end.y);
+      maxY = Math.max(maxY, w.start.y, w.end.y);
+    }
+    const curW = maxX - minX, curH = maxY - minY;
+    if (curW === 0 || curH === 0) return;
+    const sx = newWidthCm ? newWidthCm / curW : 1;
+    const sy = newHeightCm ? newHeightCm / curH : 1;
+
+    for (const w of ws) {
+      w.start = { x: minX + (w.start.x - minX) * sx, y: minY + (w.start.y - minY) * sy };
+      w.end = { x: minX + (w.end.x - minX) * sx, y: minY + (w.end.y - minY) * sy };
+    }
+  }, 'Resized room');
+}
+
+/** 
+ * Copy a room (walls + attached doors/windows + furniture/stairs inside it) N times,
+ *  placing each copy to the right of existing geometry. Runs through mutate() so undo works. 
+*/
+export function copyRoom(roomId: string, copies = 1): void {
+  mutate((f) => {
+    const source = f.rooms.find((r) => r.id === roomId);
+    if (!source) return;
+    const sourceWalls = f.walls.filter((w) => source.walls.includes(w.id));
+    if (sourceWalls.length === 0) return;
+
+    // Bounds of the source room (used to pick furniture/stairs that belong to it).
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const w of sourceWalls) {
+      minX = Math.min(minX, w.start.x, w.end.x);
+      maxX = Math.max(maxX, w.start.x, w.end.x);
+      minY = Math.min(minY, w.start.y, w.end.y);
+      maxY = Math.max(maxY, w.start.y, w.end.y);
+    }
+
+    // Snapshot the source contents before the loop so copies don't copy copies.
+    const srcDoors = f.doors.filter((d) => source.walls.includes(d.wallId));
+    const srcWindows = f.windows.filter((w) => source.walls.includes(w.wallId));
+    const srcFurniture = f.furniture.filter((it) => it.position.x >= minX && it.position.x <= maxX && it.position.y >= minY && it.position.y <= maxY);
+    const srcStairs = (f.stairs ?? []).filter((s) => s.position.x >= minX && s.position.x <= maxX && s.position.y >= minY && s.position.y <= maxY);
+
+    for (let i = 0; i < Math.max(1, copies); i++) {
+      let rightmost = 0;
+      for (const w of f.walls) rightmost = Math.max(rightmost, w.start.x, w.end.x);
+      const offsetX = (rightmost + 200) - minX; // 2m gap from existing geometry
+
+      // Map old wall id -> new wall id so doors/windows can be re-attached.
+      const wallIdMap: Record<string, string> = {};
+      for (const w of sourceWalls) {
+        const nid = uid();
+        wallIdMap[w.id] = nid;
+        f.walls.push({
+          ...w,
+          id: nid,
+          start: { x: w.start.x + offsetX, y: w.start.y },
+          end: { x: w.end.x + offsetX, y: w.end.y },
+          ...(w.curvePoint ? { curvePoint: { x: w.curvePoint.x + offsetX, y: w.curvePoint.y } } : {}),
+        });
+      }
+
+      f.rooms.push({
+        ...source,
+        id: uid(),
+        name: `${source.name} (Kopie ${i + 1})`,
+        walls: sourceWalls.map((w) => wallIdMap[w.id]),
+      });
+
+      for (const d of srcDoors) f.doors.push({ ...d, id: uid(), wallId: wallIdMap[d.wallId] });
+      for (const w of srcWindows) f.windows.push({ ...w, id: uid(), wallId: wallIdMap[w.wallId] });
+      for (const it of srcFurniture) f.furniture.push({ ...it, id: uid(), position: { x: it.position.x + offsetX, y: it.position.y } });
+      for (const s of srcStairs) f.stairs.push({ ...s, id: uid(), position: { x: s.position.x + offsetX, y: s.position.y } });
+    }
+  }, 'Copied room');
+}
+
 export function addFloor(name?: string, copyCurrentLayout = false) {
   const p = get(currentProject);
   if (!p) return;
