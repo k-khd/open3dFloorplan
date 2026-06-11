@@ -1,70 +1,63 @@
-import { get } from 'svelte/store';
-import { currentProject, loadProject, detectedRoomsStore, snapshot } from '$lib/stores/project';
-import { tools } from './aiTools';
-import { executeAction } from './floorActions';
-import { syncFloorRooms } from '$lib/utils/roomDetection';
- 
+import { beginUndoGroup, endUndoGroup } from '$lib/stores/project';
+import { tools, executeAction } from './aiActions';
+import { getActiveFloor } from './aiResolvers';
+
 export async function askAI(userMessage: string) {
-  const project = get(currentProject);
-  if (!project) return 'No project loaded.';
+  const floor = getActiveFloor();
+  if (!floor) return 'Geen project of actieve verdieping geladen.';
 
-  const floor = project.floors.find(f => f.id === project.activeFloorId);
-  if (!floor) return 'No active floor loaded.';
-
-  const roomName = floor.rooms.map((r: any) => r.name).join(", ");
+  const roomNames = floor.rooms.map((r) => r.name).join(', ') || '(nog geen kamers)';
 
   try {
-    const response = await fetch("http://localhost:11434/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    const response = await fetch('http://localhost:11434/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: "granite4.1:3b", 
+        model: 'Qwen3.5:4b',
         messages: [
-          { role: "system", content: `Je bent een behulpzame assistent voor het ontwerpen van plattegronden. Je helpt alleen gebruikers in het Nederlands met het aanmaken van kamers, plaatsen van meubels, deuren, ramen en trappen. Als je geen actie hoeft uit te voeren, praat je gewoon vriendelijk terug. 
-            Houd je antwoorden kort en bondig, maximaal 2-3 zinnen. Geen opsommingen of lijstjes tenzij de gebruiker erom vraagt.
-            De beschikbare kamers op de huidige plattegrond zijn: ${roomName}.`},
-          { role: "user", content: userMessage }
+          {
+            role: 'system',
+            content: `Je bent een behulpzame assistent voor het ontwerpen van plattegronden. 
+            Help gebruikers in het Nederlands met het aanmaken, aanpassen en inrichten van kamers (meubels, deuren, ramen, trappen). 
+            Als er geen actie nodig is, praat je gewoon kort en vriendelijk terug. Houd antwoorden kort, maximaal 2-3 zinnen.
+            Beschikbare kamers op de huidige plattegrond: ${roomNames}.`
+          },
+          { role: 'user', content: userMessage },
         ],
-        tools: tools,
+        tools,
         stream: false,
-      })
+        options: { num_ctx: 8192, temperature: 0.1 },
+      }),
     });
 
     const data = await response.json();
-    console.log("AI Response:", JSON.stringify(data.message, null, 2));
+    console.log('AI Response:', JSON.stringify(data.message, null, 2));
 
-    // if the AI called one or more tools, execute each action
-    if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
-      const updatedProject = { ...project };
-      const activeFloor = updatedProject.floors.find((f: any) => f.id === updatedProject.activeFloorId);
-      
-      snapshot(userMessage);
+    const calls = data.message?.tool_calls ?? [];
 
-      if (!activeFloor) return 'No active floor.';
+    // No tool call -> the model is just responding.
+    if (calls.length === 0) {
+      return data.message?.content ?? 'De AI gaf geen antwoord.';
+    }
 
-      let result = "";
-      for (const toolCall of data.message.tool_calls) {
-        result += executeAction(activeFloor, toolCall) + " ";
+    /**
+     * Wrap all tool calls from one user command into a single undo step. 
+     * The editor functions called inside executeAction run through mutate()
+     * so undo/redo + room detection are handled automatically.
+    */
+    beginUndoGroup();
+    let result = '';
+    try {
+      for (const toolCall of calls) {
+        result += executeAction(toolCall) + ' ';
       }
-      
-      currentProject.set(updatedProject);
-      // sync floor rooms based on walls after executing actions
-      activeFloor.rooms = syncFloorRooms(activeFloor);
-      // update detected rooms store for UI
-      detectedRoomsStore.set(activeFloor.rooms);
-
-      return result.trim();
+    } finally {
+      endUndoGroup(userMessage);
     }
 
-    // if no tool was called, the AI just responded with text (normal conversation)
-    if (data.message?.content) {
-      return data.message.content;
-    }
-
-    return "De AI gaf geen antwoord.";
-
+    return result.trim();
   } catch (error) {
-    console.error("Fetch error:", error);
-    return "Fout bij verbinden met Ollama.";
+    console.error('Fetch error:', error);
+    return 'Fout bij verbinden met Ollama.';
   }
 }
